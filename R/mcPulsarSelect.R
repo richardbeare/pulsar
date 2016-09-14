@@ -104,7 +104,8 @@
 #' @export
 pulsar <- function(data, fun=huge::huge, fargs=list(), criterion=c("stars"), thresh = 0.1,
                    subsample.ratio = NULL, rep.num = 20, seed=NULL,
-                   lb.stars=FALSE, ub.stars=FALSE, ncores = 1)  {
+                   lb.stars=FALSE, ub.stars=FALSE, ncores = 1,
+                   strata=NULL)  {
     gcinfo(FALSE)
     n <- nrow(data)
     p <- ncol(data)
@@ -115,9 +116,21 @@ pulsar <- function(data, fun=huge::huge, fargs=list(), criterion=c("stars"), thr
     .critcheck0(criterion, knowncrits)
     subsample.ratio <- .ratcheck(subsample.ratio, n)
 
+    if (is.null(strata)) strata <- rep(1, nrow(data))
     if (!is.null(seed)) set.seed(seed)
-    ind.sample <- replicate(rep.num, sample(c(1:n), floor(n * subsample.ratio), 
-                    replace = FALSE), simplify=FALSE)
+    
+    strata.list <- split(1:nrow(data), strata)
+    do.subsamp <- function()
+    {
+      s<-lapply(strata.list, function(l) {
+        sample(l, size=floor(length(l) * subsample.ratio), replace=FALSE)
+      })
+      return(do.call(c, s))
+    }
+    #ind.sample <- replicate(rep.num, sample(c(1:n), floor(n * subsample.ratio), 
+    #                replace = FALSE), simplify=FALSE)
+    # strata aware sampling
+    ind.sample <- replicate(rep.num, do.subsamp(), simplify = FALSE)
     if (!is.null(seed)) set.seed(NULL)
     estFun <- function(ind.sample, fargs) {
         tmp <- do.call(fun, c(fargs, list(data[ind.sample,])))
